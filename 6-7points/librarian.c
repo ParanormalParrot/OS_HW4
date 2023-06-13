@@ -41,7 +41,8 @@ int main(int argc, char *argv[]) {
     signal(SIGINT, exit_program);
 
     ssize_t read_message;
-    sockaddr_in sockets[number_of_students];
+    struct sockaddr_in sockets[number_of_students];
+    struct sockaddr_in presenter_addr;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
 
@@ -59,16 +60,11 @@ int main(int argc, char *argv[]) {
         exit_program();
     }
 
-    if (listen(server_socket, number_of_students) < 0) {
-        perror("Error in listen function\n");
-        exit_program();
-    }
-
     printf("Waiting for presenter...\n");
-    int presenter_socket;
     char buffer[BUFFER_SIZE];
-    if ((presenter_socket = recvfrom(server_socket, (struct sockaddr *) &address, (socklen_t * ) & addrlen)) < 0) {
-        printf("Error in accept() function for presenter\n");
+    ssize_t recv_presenter = recvfrom(server_socket, buffer, sizeof(buffer), 0, (struct sockaddr *)&address, (socklen_t *)&addrlen);
+    if (recv_presenter < 0) {
+        printf("Error in recvfrom() function for client presenter\n");
         exit_program();
     }
     printf("Presenter connected\n");
@@ -77,11 +73,18 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < number_of_students; ++i) {
         // Принятие входящего подключения
-        if ((sockets[i] = accept(server_socket, (struct sockaddr *) &address, (socklen_t * ) & addrlen)) < 0) {
-            printf("Error in accept() function for client %d\n", i);
+        char init_buffer[BUFFER_SIZE];
+        memset(init_buffer, 0, sizeof(init_buffer));
+        ssize_t recv_res = recvfrom(server_socket, init_buffer, sizeof(init_buffer), 0, (struct sockaddr *) &address,
+                &addrlen);
+        if (recv_res < 0) {
+            printf("Error in recvfrom() function for client %d\n", i);
             exit_program();
         }
-        printf("Client %d connected\n", i);
+        printf("Client %d connected\n", i + 1);
+        // Сохранение адреса и порта клиента
+        memcpy(&sockets[i], &address, sizeof(address));
+
     }
     for (int i = 0; i < m * n * k; ++i) {
         books[i] = rand() % 1000;
@@ -92,14 +95,17 @@ int main(int argc, char *argv[]) {
         for (int j = 0; j < row_size; ++j) {
             row[j] = books[j + i * n * k];
         }
-        send(sockets[i % number_of_students], &n, sizeof(n), 0);
-        send(sockets[i % number_of_students], &k, sizeof(k), 0);
-        send(sockets[i % number_of_students], &i, sizeof(i), 0);
-        send(sockets[i % number_of_students], row, n * k * sizeof(int), 0);
-        recv(sockets[i % number_of_students], row, n * k * sizeof(int), 0);
-        recv(sockets[i % number_of_students], buffer, sizeof(buffer), 0);
-        send(presenter_socket, buffer, sizeof(buffer), 0);
-        for (int j = 0; j < row_size; ++j) {
+        sendto(server_socket, &n, sizeof(n), 0, (struct sockaddr *) &sockets[i % number_of_students],
+               sizeof(struct sockaddr_in));
+        sendto(server_socket, &k, sizeof(k), 0, (struct sockaddr *) &sockets[i % number_of_students],
+               sizeof(struct sockaddr_in));
+        sendto(server_socket, &i, sizeof(i), 0, (struct sockaddr *) &sockets[i % number_of_students],
+               sizeof(struct sockaddr_in));
+        sendto(server_socket, row, n * k * sizeof(int), 0, (struct sockaddr *) &sockets[i % number_of_students],
+               sizeof(struct sockaddr_in));
+        recvfrom(server_socket, row, n * k * sizeof(int), 0, (struct sockaddr *) &sockets[i % number_of_students],
+                 sizeof(struct sockaddr_in));
+        for (int j = 0; j <row_size; ++j) {
             books[j + i * n * k] = row[j];
         }
     }
@@ -124,15 +130,15 @@ int main(int argc, char *argv[]) {
                (i / k % n) + 1, (i / k / n) + 1);
         sprintf(buffer, "Book %d at the position %d of the bookshelf %d in the row %d.\n", books[i], (i % k) + 1,
                 (i / k % n) + 1, (i / k / n) + 1);
-        send(presenter_socket, &buffer, sizeof(buffer), 0);
+        sendto(server_socket, &buffer, sizeof(buffer), 0, (struct sockaddr *)&presenter_addr, sizeof(struct sockaddr_in));
     }
 
     int exit_code = -1;
     for (int i = 0; i < number_of_students; ++i) {
-        send(sockets[i], &exit_code, sizeof(int), 0);
+        // Отправка кода клиенту длfя завершения работы программы
+        sendto(server_socket, &exit_code, sizeof(int), 0, (struct sockaddr *) &sockets[i], sizeof(struct sockaddr_in));
     }
-
     sprintf(buffer, "stop");
-    send(presenter_socket, &buffer, sizeof(buffer), 0);
+    sendto(server_socket, &buffer, sizeof(buffer), 0, (struct sockaddr *)&presenter_addr, sizeof(struct sockaddr_in));
     exit_program();
 }

@@ -11,8 +11,7 @@
 
 int client_socket;
 
-void exit_program()
-{
+void exit_program() {
     printf("\nClose socket and exit program\n");
     close(client_socket);
     exit(0);
@@ -40,18 +39,17 @@ int main(int argc, char *argv[]) {
         exit_program();
     }
 
-    // Подключение к серверу
-    if (connect(client_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0) {
-        perror("Error while connecting to the server\n");
-        exit_program();
-    }
+    char buffer[BUFFER_SIZE];
+    int str_len;
+    sprintf(buffer, "init");
+    sendto(client_socket, &buffer, sizeof(buffer), 0, (struct sockaddr *) &server_address, sizeof(server_address));
 
     printf("Connected to the server\n");
 
-    char buffer[BUFFER_SIZE];
-
     while (1) {
-        str_len = recv(client_socket, &buffer, sizeof(buffer), 0);
+        struct sockaddr_in server_response;
+        socklen_t addrlen = sizeof(server_response);
+        str_len = recvfrom(client_socket, &buffer, sizeof(buffer), 0, (struct sockaddr *) &server_response, &addrlen);
         if (strcmp(buffer, "stop") == 0) {
             break;
         }

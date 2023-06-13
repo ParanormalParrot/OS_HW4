@@ -25,6 +25,7 @@ int main(int argc, char *argv[]) {
         exit_program();
     }
     struct sockaddr_in server_addr;
+    student_number = atoi(argv[3]);
     if ((client_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("Ошибка при создании сокета");
         exit_program();
@@ -32,10 +33,12 @@ int main(int argc, char *argv[]) {
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(atoi(argv[2]));
     inet_pton(AF_INET, argv[1], &server_addr.sin_addr);
-    student_number = atoi(argv[3]);
 
-    char buffer[1024];
+
+    char buffer[BUFFER_SIZE];
     sprintf(buffer, "init");
+    sendto(client_socket, &buffer, sizeof(buffer), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    printf("Connected to the server\n");
     while (1) {
         struct sockaddr_in server_response;
         socklen_t addrlen = sizeof(server_response);
@@ -78,13 +81,13 @@ int main(int argc, char *argv[]) {
                    (j % k + 1), (j / n + 1), row_index + 1);
             usleep(rand() % 10);
         }
-        if (send(client_socket, row, n * k * sizeof(int), 0) < 0) {
+        if (sendto(client_socket, row, n * k * sizeof(int), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
             perror("Send failed");
             exit(1);
         }
         printf("Student %d have finished sorting subcatalogue for row %d and passed it to the librarian.\n",
                student_number, row_index + 1);
-        sprintf(buffer, "Student %d have finished sorting subcatalogue for row %d and passed it to the librarian.\n",
+        sprintf(buffer, "Student %d have finished sorting the subcatalogue for row %d and passed it to the librarian.\n",
                 student_number, row_index + 1);
         if (sendto(client_socket, row, n * k * sizeof(int), 0, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
             perror("Send failed");
