@@ -68,6 +68,8 @@ int main(int argc, char *argv[]) {
         exit_program();
     }
     printf("Presenter connected\n");
+    // Сохранение адреса и порта presenter
+    memcpy(&presenter_addr, &address, sizeof(address));
 
     printf("Librarian is waiting for students...\n");
 
