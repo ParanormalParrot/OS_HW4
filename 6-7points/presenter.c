@@ -50,10 +50,12 @@ int main(int argc, char *argv[]) {
         struct sockaddr_in server_response;
         socklen_t addrlen = sizeof(server_response);
         str_len = recvfrom(client_socket, &buffer, sizeof(buffer), 0, (struct sockaddr *) &server_response, &addrlen);
-        if (strcmp(buffer, "stop") == 0) {
-            break;
+        if (str_len > 0) {
+            if (strcmp(buffer, "stop") == 0) {
+                break;
+            }
+            printf("%s", buffer);
         }
-        printf(buffer);
     }
     exit_program();
 }
